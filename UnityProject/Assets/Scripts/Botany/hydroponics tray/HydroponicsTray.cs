@@ -48,6 +48,7 @@ public class HydroponicsTray : NetworkBehaviour, IInteractable<HandApply>
 
 	public override void OnStartServer()
 	{
+		EnsureInit();
 		UpdateManager.Instance.Add(ServerUpdate);
 		IsServer = true;
 		if (isSoilPile)
@@ -65,6 +66,12 @@ public class HydroponicsTray : NetworkBehaviour, IInteractable<HandApply>
 
 	public void OnEnable()
 	{
+		EnsureInit();
+	}
+
+	private void EnsureInit()
+	{
+		if (registerTile != null) return;
 		registerTile = GetComponent<RegisterTile>();
 	}
 
@@ -344,6 +351,11 @@ public class HydroponicsTray : NetworkBehaviour, IInteractable<HandApply>
 				plantSprite.PushTexture();
 				break;
 			case PlantSpriteStage.Growing:
+				if (growingPlantStage >= plantData.GrowthSprites.Count)
+				{
+					Logger.Log($"Plant data does not contain growthsprites for index: {growingPlantStage} in plantData.GrowthSprites. Plant: {plantData.Plantname}");
+					return;
+				}
 				plantSprite.spriteData = SpriteFunctions.SetupSingleSprite(plantData.GrowthSprites[growingPlantStage]);
 				plantSprite.PushTexture();
 				break;
@@ -527,7 +539,7 @@ public class HydroponicsTray : NetworkBehaviour, IInteractable<HandApply>
 				Logger.Log("plantData.ProduceObject returned an empty gameobject on spawn, skipping this crop produce", Category.Botany);
 				continue;
 			}
-			
+
 			CustomNetTransform netTransform = _Object.GetComponent<CustomNetTransform>();
 			var food = _Object.GetComponent<GrownFood>();
 			if (food != null)
