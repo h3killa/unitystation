@@ -50,7 +50,6 @@ public class SpriteHandler : MonoBehaviour
 	{
 		yield return WaitFor.EndOfFrame;
 		Initialised = true;
-		spriteRenderer = this.GetComponent<SpriteRenderer>();
 		if (spriteData == null) {
 			spriteData = new SpriteData();
 		}
@@ -58,6 +57,11 @@ public class SpriteHandler : MonoBehaviour
 		{
 			PushTexture();
 		}
+	}
+
+	private void OnEnable()
+	{
+		spriteRenderer = GetComponent<SpriteRenderer>();
 	}
 
 	private void OnDisable()
@@ -80,6 +84,29 @@ public class SpriteHandler : MonoBehaviour
 		TryToggleAnimationState(false);
 	}
 
+	private bool isPaletted()
+	{
+		if (spriteData.isPaletteds.Count == 0)
+			return false;
+		if (spriteData.isPaletteds.Count == 1)
+			return spriteData.isPaletteds[0];
+		return spriteData.isPaletteds[spriteIndex];
+	}
+
+	private List<Color> getPaletteOrNull()
+	{
+		bool _isPaletted = isPaletted();
+
+		if (!_isPaletted)
+			return null;
+
+		if (spriteData.palettes.Count == 1)
+			return spriteData.palettes[0];
+
+		return spriteData.palettes[spriteIndex];
+	}
+
+
 	public void PushTexture()
 	{
 		if (Initialised)
@@ -90,7 +117,10 @@ public class SpriteHandler : MonoBehaviour
 					variantIndex < spriteData.List[spriteIndex].Count &&
 					animationIndex < spriteData.List[spriteIndex][variantIndex].Count)
 				{
-					SetSprite(spriteData.List[spriteIndex][variantIndex][animationIndex]);
+					SpriteInfo curSpriteInfo = spriteData.List[spriteIndex][variantIndex][animationIndex];
+					
+					SetSprite(curSpriteInfo, getPaletteOrNull());
+
 					TryToggleAnimationState(spriteData.List[spriteIndex][variantIndex].Count > 1);
 					return;
 				}
@@ -98,7 +128,10 @@ public class SpriteHandler : MonoBehaviour
 						 variantIndex < spriteData.List[spriteIndex].Count)
 				{
 					animationIndex = 0;
-					SetSprite(spriteData.List[spriteIndex][variantIndex][animationIndex]);
+
+					SpriteInfo curSpriteInfo = spriteData.List[spriteIndex][variantIndex][animationIndex];
+					SetSprite(curSpriteInfo, getPaletteOrNull());
+
 					TryToggleAnimationState(spriteData.List[spriteIndex][variantIndex].Count > 1);
 					return;
 				}
@@ -120,7 +153,9 @@ public class SpriteHandler : MonoBehaviour
 			{
 				animationIndex = 0;
 			}
-			SetSprite(spriteData.List[spriteIndex][variantIndex][animationIndex]);
+
+			SpriteInfo curSpriteInfo = spriteData.List[spriteIndex][variantIndex][animationIndex];
+			SetSprite(curSpriteInfo, getPaletteOrNull());
 		}
 		if (!isAnimation)
 		{
@@ -129,11 +164,36 @@ public class SpriteHandler : MonoBehaviour
 		}
 	}
 
-	private void SetSprite(SpriteInfo animationStills)
+	private void SetSprite(SpriteInfo animationStills, List<Color> palette = null)
 	{
 		timeElapsed = 0;
 		waitTime = animationStills.waitTime;
+		if (spriteRenderer == null)
+		{
+			spriteRenderer = GetComponent<SpriteRenderer>();
+			if (spriteRenderer == null)
+			{
+				Logger.Log($"There is no spriterenderer on this object {name}");
+				return;
+			}
+		}
 		spriteRenderer.sprite = animationStills.sprite;
+		MaterialPropertyBlock block = new MaterialPropertyBlock();
+		spriteRenderer.GetPropertyBlock(block);
+
+		if (palette != null)
+		{
+			List<Vector4> pal = palette.ConvertAll<Vector4>((Color c) => new Vector4(c.r, c.g, c.b, c.a));
+			block.SetVectorArray("_ColorPalette", pal);
+			block.SetInt("_IsPaletted", 1);
+		}
+		else
+		{
+			block.SetInt("_IsPaletted", 0);
+		}
+		spriteRenderer.SetPropertyBlock(block);
+
+
 	}
 
 	public void ChangeSprite(int newSprites)
@@ -146,7 +206,10 @@ public class SpriteHandler : MonoBehaviour
 			{
 				spriteIndex = newSprites;
 				animationIndex = 0;
-				SetSprite(spriteData.List[spriteIndex][variantIndex][animationIndex]);
+
+				SpriteInfo curSpriteInfo = spriteData.List[spriteIndex][variantIndex][animationIndex];
+				SetSprite(curSpriteInfo, getPaletteOrNull());
+
 				TryToggleAnimationState(spriteData.List[spriteIndex][variantIndex].Count > 1);
 			}
 		}
@@ -164,8 +227,11 @@ public class SpriteHandler : MonoBehaviour
 				{
 					animationIndex = 0;
 				}
-				SetSprite(spriteData.List[spriteIndex][spriteVariant][animationIndex]);
 				variantIndex = spriteVariant;
+
+				SpriteInfo curSpriteInfo = spriteData.List[spriteIndex][variantIndex][animationIndex];
+				SetSprite(curSpriteInfo, getPaletteOrNull());
+
 				TryToggleAnimationState(spriteData.List[spriteIndex][variantIndex].Count > 1);
 			}
 		}
@@ -201,7 +267,8 @@ public class SpriteHandler : MonoBehaviour
 			PushTexture();
 		}
 		else {
-			SetSpriteOnStartUp = true;		}
+			SetSpriteOnStartUp = true;
+		}
 	}
 
 	/// <summary>
@@ -227,7 +294,6 @@ public class SpriteHandler : MonoBehaviour
 	void Start()
 	{
 		AddSprites();
-		spriteRenderer = this.GetComponent<SpriteRenderer>();
 		StartCoroutine(WaitForInitialisation());
 	}
 
